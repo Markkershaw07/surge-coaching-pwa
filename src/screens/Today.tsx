@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Droplets, Footprints, Zap, ChevronRight } from 'lucide-react';
+import { Droplets, Footprints, Zap, ChevronRight, CheckSquare } from 'lucide-react';
 import { ProgressRing } from '../components/ProgressRing';
+import { DayChecklist } from '../components/DayChecklist';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDayType } from '../hooks/useDayType';
+import { useChecklistItems } from '../hooks/useChecklistItems';
 import { SESSION_LABELS, SESSION_COLOURS } from '../data/schedule';
 import { NUTRITION_PLAN, computeDayTotals } from '../data/nutrition';
 import { DEFAULT_TARGETS } from '../data/targets';
@@ -11,8 +13,10 @@ import type { HydrationPayload, StepsPayload } from '../types';
 export function Today() {
   const { session, dayType } = useDayType();
   const { addEntry, getByType, loading } = useDailyLog();
+  const { doneCount, totalCount } = useChecklistItems();
   const [stepsInput, setStepsInput] = useState('');
   const [showStepsInput, setShowStepsInput] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
 
   const plan = NUTRITION_PLAN[dayType];
 
@@ -70,6 +74,7 @@ export function Today() {
   const dayName = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 
   return (
+    <>
     <div className="space-y-4 pb-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -81,6 +86,19 @@ export function Today() {
           {SESSION_LABELS[session]}
         </span>
       </div>
+
+      {/* Daily Checklist entry card */}
+      <button
+        onClick={() => setShowChecklist(true)}
+        className="w-full bg-slate-800 rounded-2xl p-4 flex items-center gap-3 active:bg-slate-700"
+      >
+        <CheckSquare size={18} className="text-orange-400" />
+        <div className="text-left">
+          <p className="font-semibold text-slate-200">Daily Checklist</p>
+          <p className="text-xs text-slate-500">{doneCount} of {totalCount} complete</p>
+        </div>
+        <ChevronRight size={16} className="text-slate-500 ml-auto" />
+      </button>
 
       {/* Hydration Card */}
       <div className="bg-slate-800 rounded-2xl p-4">
@@ -200,5 +218,8 @@ export function Today() {
         )}
       </div>
     </div>
+
+    {showChecklist && <DayChecklist onClose={() => setShowChecklist(false)} />}
+    </>
   );
 }
