@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Droplets, Footprints, Zap, ChevronRight, CheckSquare } from 'lucide-react';
 import { ProgressRing } from '../components/ProgressRing';
-import { DayChecklist } from '../components/DayChecklist';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDayType } from '../hooks/useDayType';
 import { useChecklistItems } from '../hooks/useChecklistItems';
@@ -10,13 +9,14 @@ import { NUTRITION_PLAN, computeDayTotals } from '../data/nutrition';
 import { DEFAULT_TARGETS } from '../data/targets';
 import type { HydrationPayload, StepsPayload } from '../types';
 
-export function Today() {
+interface TodayProps { onOpenChecklist: () => void; }
+
+export function Today({ onOpenChecklist }: TodayProps) {
   const { session, dayType } = useDayType();
   const { addEntry, getByType, loading } = useDailyLog();
   const { doneCount, totalCount } = useChecklistItems();
   const [stepsInput, setStepsInput] = useState('');
   const [showStepsInput, setShowStepsInput] = useState(false);
-  const [showChecklist, setShowChecklist] = useState(false);
 
   const plan = NUTRITION_PLAN[dayType];
 
@@ -89,7 +89,7 @@ export function Today() {
 
       {/* Daily Checklist entry card */}
       <button
-        onClick={() => setShowChecklist(true)}
+        onClick={onOpenChecklist}
         className="w-full bg-slate-800 rounded-2xl p-4 flex items-center gap-3 active:bg-slate-700"
       >
         <CheckSquare size={18} className="text-orange-400" />
@@ -218,8 +218,6 @@ export function Today() {
         )}
       </div>
     </div>
-
-    {showChecklist && <DayChecklist onClose={() => setShowChecklist(false)} />}
     </>
   );
 }

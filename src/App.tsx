@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Home, Dumbbell, UtensilsCrossed, BarChart2, TrendingUp, Settings2 } from 'lucide-react';
 import { Today } from './screens/Today';
+import { DayChecklist } from './components/DayChecklist';
 import { Workout } from './screens/Workout';
 import { Nutrition } from './screens/Nutrition';
 import { Tracker } from './screens/Tracker';
@@ -20,18 +21,21 @@ const TABS: { id: Tab; label: string; Icon: React.ElementType }[] = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('today');
+  const [checklistOpen, setChecklistOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col max-w-md mx-auto">
       {/* Main content area */}
       <main className="flex-1 overflow-y-auto px-4 pt-4 pb-24">
-        {activeTab === 'today' && <Today />}
+        {activeTab === 'today' && <Today onOpenChecklist={() => setChecklistOpen(true)} />}
         {activeTab === 'workout' && <Workout />}
         {activeTab === 'nutrition' && <Nutrition />}
         {activeTab === 'tracker' && <Tracker />}
         {activeTab === 'progress' && <Progress />}
         {activeTab === 'settings' && <Settings />}
       </main>
+
+      {checklistOpen && <DayChecklist onClose={() => setChecklistOpen(false)} />}
 
       {/* Bottom navigation */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 pb-safe">

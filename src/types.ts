@@ -107,16 +107,3 @@ export interface Targets {
   cardioZ3PerWeek: number;
 }
 
-export type ChecklistItemKind =
-  | 'supplement-group' | 'meal' | 'workout'
-  | 'hydration' | 'steps' | 'manual';
-
-export interface ChecklistItem {
-  id: string;
-  kind: ChecklistItemKind;
-  label: string;
-  sublabel?: string;
-  ticked: boolean;
-  partial?: boolean;
-  trainingOnly: boolean;
-}
