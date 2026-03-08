@@ -1,17 +1,12 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Check } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
 import { useChecklistItems } from '../hooks/useChecklistItems';
 import { useDayType } from '../hooks/useDayType';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { SESSION_COLOURS, SESSION_LABELS } from '../data/schedule';
+import { MOVEMENT_PREP } from '../data/movementPrep';
 import type { ChecklistSection, ChecklistItemDef } from '../data/checklistSchedule';
 import type { WeightPayload } from '../types';
-
-interface Props {
-  onClose: () => void;
-}
-
-// ─── Weigh row — special case with inline kg input ────────────────────────────
 
 interface WeighRowProps {
   ticked: boolean;
@@ -45,8 +40,8 @@ function WeighRow({ ticked, isNext, loggedKg, onToggle, onLogWeight }: WeighRowP
   const circleClass = ticked
     ? 'w-7 h-7 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0'
     : isNext
-    ? 'w-7 h-7 rounded-full border-2 border-orange-400 flex items-center justify-center flex-shrink-0'
-    : 'w-7 h-7 rounded-full border-2 border-slate-600 flex items-center justify-center flex-shrink-0';
+      ? 'w-7 h-7 rounded-full border-2 border-orange-400 flex items-center justify-center flex-shrink-0'
+      : 'w-7 h-7 rounded-full border-2 border-slate-600 flex items-center justify-center flex-shrink-0';
 
   return (
     <div className="py-1">
@@ -101,68 +96,75 @@ function WeighRow({ ticked, isNext, loggedKg, onToggle, onLogWeight }: WeighRowP
   );
 }
 
-// ─── Standard item row ────────────────────────────────────────────────────────
-
 interface ItemRowProps {
   item: ChecklistItemDef;
   ticked: boolean;
   isNext: boolean;
   onToggle: (id: string) => void;
+  movementPrepDetails?: { name: string; detail: string }[];
 }
 
-function ItemRow({ item, ticked, isNext, onToggle }: ItemRowProps) {
+function ItemRow({ item, ticked, isNext, onToggle, movementPrepDetails }: ItemRowProps) {
   const circleClass = ticked
     ? 'w-7 h-7 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0'
     : isNext
-    ? 'w-7 h-7 rounded-full border-2 border-orange-400 flex items-center justify-center flex-shrink-0'
-    : 'w-7 h-7 rounded-full border-2 border-slate-600 flex items-center justify-center flex-shrink-0';
+      ? 'w-7 h-7 rounded-full border-2 border-orange-400 flex items-center justify-center flex-shrink-0'
+      : 'w-7 h-7 rounded-full border-2 border-slate-600 flex items-center justify-center flex-shrink-0';
 
-  const sublabel = [item.dose, item.hint].filter(Boolean).join(' · ');
+  const sublabel = [item.dose, item.hint].filter(Boolean).join(' | ');
 
   return (
-    <button
-      onClick={() => onToggle(item.id)}
-      className="w-full flex items-center gap-3 py-3 text-left active:opacity-70 min-h-[56px]"
-    >
-      <div className={circleClass}>
-        {ticked && <Check size={14} strokeWidth={3} className="text-white" />}
-      </div>
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <p className={`text-sm font-medium ${ticked ? 'text-slate-400 line-through' : 'text-slate-200'}`}>
-            {item.label}
-          </p>
-          {isNext && !ticked && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/20 text-orange-400">
-              NEXT
-            </span>
+    <div className="py-1">
+      <button
+        onClick={() => onToggle(item.id)}
+        className="w-full flex items-center gap-3 py-3 text-left active:opacity-70 min-h-[56px]"
+      >
+        <div className={circleClass}>
+          {ticked && <Check size={14} strokeWidth={3} className="text-white" />}
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <p className={`text-sm font-medium ${ticked ? 'text-slate-400 line-through' : 'text-slate-200'}`}>
+              {item.label}
+            </p>
+            {isNext && !ticked && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/20 text-orange-400">
+                NEXT
+              </span>
+            )}
+          </div>
+          {sublabel && (
+            <p className="text-xs text-slate-500 mt-0.5">{sublabel}</p>
           )}
         </div>
-        {sublabel && (
-          <p className="text-xs text-slate-500 mt-0.5">{sublabel}</p>
-        )}
-      </div>
-    </button>
+      </button>
+      {item.id === 'movement-prep' && movementPrepDetails && movementPrepDetails.length > 0 && (
+        <div className="ml-10 pb-2 space-y-1">
+          {movementPrepDetails.map(exercise => (
+            <div key={exercise.name} className="text-xs text-slate-500">
+              {exercise.name} - {exercise.detail}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
-
-// ─── Meal timer helper ────────────────────────────────────────────────────────
 
 function formatMealTimer(lastMealTs: number): { text: string; colour: string } {
   const minsAgo = Math.floor((Date.now() - lastMealTs) / 60_000);
   const h = Math.floor(minsAgo / 60);
   const m = minsAgo % 60;
   const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-  if (minsAgo < 120) {
-    return { text: `last meal ${timeStr} ago · on track`, colour: 'text-green-400' };
-  } else if (minsAgo < 210) {
-    return { text: `last meal ${timeStr} ago · eat soon`, colour: 'text-orange-400' };
-  } else {
-    return { text: `last meal ${timeStr} ago · eat now!`, colour: 'text-red-400' };
-  }
-}
 
-// ─── Section block ────────────────────────────────────────────────────────────
+  if (minsAgo < 120) {
+    return { text: `last meal ${timeStr} ago | on track`, colour: 'text-green-400' };
+  }
+  if (minsAgo < 210) {
+    return { text: `last meal ${timeStr} ago | eat soon`, colour: 'text-orange-400' };
+  }
+  return { text: `last meal ${timeStr} ago | eat now`, colour: 'text-red-400' };
+}
 
 interface SectionProps {
   section: ChecklistSection;
@@ -172,15 +174,23 @@ interface SectionProps {
   onToggle: (id: string) => void;
   loggedKg: number | null;
   onLogWeight: (kg: number) => void;
+  movementPrepDetails?: { name: string; detail: string }[];
 }
 
 function SectionBlock({
-  section, ticks, nextItemId, lastMealTs, onToggle, loggedKg, onLogWeight,
+  section,
+  ticks,
+  nextItemId,
+  lastMealTs,
+  onToggle,
+  loggedKg,
+  onLogWeight,
+  movementPrepDetails,
 }: SectionProps) {
   const mealTimer = section.isMeals && lastMealTs > 0 ? formatMealTimer(lastMealTs) : null;
 
   return (
-    <div className="mt-6">
+    <div className="mt-6 first:mt-0">
       <div className="mb-1">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
           {section.title}
@@ -191,7 +201,7 @@ function SectionBlock({
           <p className="text-xs text-slate-600 mt-0.5">{section.subtitle}</p>
         ) : null}
       </div>
-      <div className="divide-y divide-slate-800/60">
+      <div className="divide-y divide-slate-800/60 rounded-2xl bg-slate-800 px-4">
         {section.items.map(item => {
           const ticked = ticks[item.id]?.ticked ?? false;
           const isNext = item.id === nextItemId;
@@ -216,6 +226,7 @@ function SectionBlock({
               ticked={ticked}
               isNext={isNext}
               onToggle={onToggle}
+              movementPrepDetails={item.id === 'movement-prep' ? movementPrepDetails : undefined}
             />
           );
         })}
@@ -224,33 +235,22 @@ function SectionBlock({
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-
-export function DayChecklist({ onClose }: Props) {
+export function DayChecklist() {
   const { sections, ticks, doneCount, totalCount, toggle, nextItemId, lastMealTs } = useChecklistItems();
   const { session } = useDayType();
   const { addEntry, getByType } = useDailyLog();
-  const [visible, setVisible] = useState(false);
   const [, setMinuteTick] = useState(0);
-
-  useEffect(() => {
-    requestAnimationFrame(() => setVisible(true));
-  }, []);
 
   useEffect(() => {
     const t = setInterval(() => setMinuteTick(n => n + 1), 60_000);
     return () => clearInterval(t);
   }, []);
 
-  const handleClose = () => {
-    setVisible(false);
-    setTimeout(onClose, 200);
-  };
-
   const weightEntries = getByType('weight');
   const loggedKg = weightEntries.length > 0
     ? (weightEntries[weightEntries.length - 1].payload as WeightPayload).kg
     : null;
+  const movementPrepDetails = MOVEMENT_PREP[session] ?? [];
 
   const handleLogWeight = async (kg: number) => {
     await addEntry('weight', { kg });
@@ -260,18 +260,9 @@ export function DayChecklist({ onClose }: Props) {
   const allDone = doneCount === totalCount;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] bg-slate-900 overflow-y-auto"
-      style={{
-        transform: visible ? 'translateY(0)' : 'translateY(100%)',
-        transition: 'transform 200ms ease-out',
-      }}
-    >
-      <div className="sticky top-0 bg-slate-900 z-10 flex items-center gap-3 px-4 py-4 border-b border-slate-800">
-        <button onClick={handleClose} className="text-slate-400 active:text-slate-200 p-1 -ml-1">
-          <ArrowLeft size={20} />
-        </button>
-        <h2 className="font-bold text-slate-100 flex-1">Daily Checklist</h2>
+    <div className="space-y-4 pb-6">
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-slate-100 flex-1">Daily Checklist</h1>
         <span className="text-sm font-semibold text-orange-400 mr-1">
           {doneCount}/{totalCount}
         </span>
@@ -280,7 +271,7 @@ export function DayChecklist({ onClose }: Props) {
         </span>
       </div>
 
-      <div className="px-4 pb-8">
+      <div>
         {sections.map(section => (
           <SectionBlock
             key={section.id}
@@ -291,6 +282,7 @@ export function DayChecklist({ onClose }: Props) {
             onToggle={toggle}
             loggedKg={loggedKg}
             onLogWeight={handleLogWeight}
+            movementPrepDetails={movementPrepDetails}
           />
         ))}
 

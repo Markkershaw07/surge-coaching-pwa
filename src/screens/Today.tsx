@@ -20,7 +20,6 @@ export function Today({ onOpenChecklist }: TodayProps) {
 
   const plan = NUTRITION_PLAN[dayType];
 
-  // Compute today's selected alternatives (from meal log entries)
   const mealEntries = getByType('meal');
   const selections: Record<string, string> = {};
   for (const e of mealEntries) {
@@ -29,18 +28,15 @@ export function Today({ onOpenChecklist }: TodayProps) {
   }
   const totals = computeDayTotals(plan, selections);
 
-  // Hydration
   const hydrationEntries = getByType('hydration');
   const totalMl = hydrationEntries.reduce((sum, e) => sum + (e.payload as HydrationPayload).ml, 0);
   const totalL = totalMl / 1000;
   const hydrationTarget = DEFAULT_TARGETS.hydrationMinL;
 
-  // Steps
   const stepsEntries = getByType('steps');
   const stepsEntry = stepsEntries[stepsEntries.length - 1];
   const currentSteps = stepsEntry ? (stepsEntry.payload as StepsPayload).steps : 0;
 
-  // Supplement status dots
   const suppEntries = getByType('supplement');
   const morningDone = suppEntries.filter(e => {
     const p = e.payload as { name: string; taken: boolean };
@@ -60,7 +56,7 @@ export function Today({ onOpenChecklist }: TodayProps) {
   };
 
   const handleLogSteps = async () => {
-    const n = parseInt(stepsInput);
+    const n = parseInt(stepsInput, 10);
     if (!isNaN(n) && n > 0) {
       await addEntry('steps', { steps: n }, `steps-${new Date().toISOString().split('T')[0]}`);
       setShowStepsInput(false);
@@ -68,15 +64,13 @@ export function Today({ onOpenChecklist }: TodayProps) {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-500">Loading…</div>;
+  if (loading) return <div className="flex items-center justify-center h-64 text-slate-500">Loading...</div>;
 
   const today = new Date();
   const dayName = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 
   return (
-    <>
     <div className="space-y-4 pb-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-slate-500">{dayName}</p>
@@ -87,7 +81,6 @@ export function Today({ onOpenChecklist }: TodayProps) {
         </span>
       </div>
 
-      {/* Daily Checklist entry card */}
       <button
         onClick={onOpenChecklist}
         className="w-full bg-slate-800 rounded-2xl p-4 flex items-center gap-3 active:bg-slate-700"
@@ -97,15 +90,15 @@ export function Today({ onOpenChecklist }: TodayProps) {
           <p className="font-semibold text-slate-200">Daily Checklist</p>
           <p className="text-xs text-slate-500">{doneCount} of {totalCount} complete</p>
         </div>
-        <ChevronRight size={16} className="text-slate-500 ml-auto" />
+        <span className="text-xs text-slate-500 ml-auto">Open</span>
+        <ChevronRight size={16} className="text-slate-500" />
       </button>
 
-      {/* Hydration Card */}
       <div className="bg-slate-800 rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Droplets size={18} className="text-blue-400" />
           <h2 className="font-semibold text-slate-200">Hydration</h2>
-          <span className="ml-auto text-xs text-slate-500">Coach target: 4.5–6L</span>
+          <span className="ml-auto text-xs text-slate-500">Coach target: 4.5-6L</span>
         </div>
         <div className="flex items-center gap-6">
           <ProgressRing
@@ -132,12 +125,11 @@ export function Today({ onOpenChecklist }: TodayProps) {
                 +500ml
               </button>
             </div>
-            <p className="text-xs text-slate-500">On wake: 500ml–1L with electrolyte · 500ml with each meal</p>
+            <p className="text-xs text-slate-500">On wake: 500ml-1L with electrolyte | 500ml with each meal</p>
           </div>
         </div>
       </div>
 
-      {/* Supplement Status */}
       <div className="bg-slate-800 rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Zap size={18} className="text-yellow-400" />
@@ -162,7 +154,6 @@ export function Today({ onOpenChecklist }: TodayProps) {
         </div>
       </div>
 
-      {/* Today's Macros Summary */}
       <div className="bg-slate-800 rounded-2xl p-4">
         <h2 className="font-semibold text-slate-200 mb-3">Today's Nutrition</h2>
         <div className="grid grid-cols-4 gap-2 text-center mb-2">
@@ -182,7 +173,6 @@ export function Today({ onOpenChecklist }: TodayProps) {
         <p className="text-xs text-slate-600 text-center">Totals reflect your current meal selections</p>
       </div>
 
-      {/* Steps / Cardio */}
       <div className="bg-slate-800 rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Footprints size={18} className="text-green-400" />
@@ -218,6 +208,5 @@ export function Today({ onOpenChecklist }: TodayProps) {
         )}
       </div>
     </div>
-    </>
   );
 }
