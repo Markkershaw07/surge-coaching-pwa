@@ -1,47 +1,39 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDayType } from './useDayType';
 import { useDailyLog } from './useDailyLog';
+import { useAppSettings } from './useAppSettings';
 import { TRAINING_SECTIONS, REST_SECTIONS } from '../data/checklistSchedule';
-import { DEFAULT_TARGETS } from '../data/targets';
-import type {
-  HydrationPayload,
-  MealPayload,
-  StepsPayload,
-  SupplementPayload,
-} from '../types';
+import { NUTRITION_PLAN } from '../data/nutrition';
+import type { ChecklistItemState, HydrationPayload, MealPayload, StepsPayload, SupplementPayload } from '../types';
+
+function getManualStorageKey() {
+  return `surge_checklist_${new Date().toISOString().split('T')[0]}`;
+}
 
 type TickEntry = { ticked: boolean; ts: number };
 type TickStore = Record<string, TickEntry>;
 
-function getSavedNumber(key: string, fallback: number): number {
-  const raw = localStorage.getItem(key);
-  if (!raw) return fallback;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : fallback;
+function readManualTicks(storageKey: string): TickStore {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey) ?? '{}') as TickStore;
+  } catch {
+    return {};
+  }
 }
 
 export function useChecklistItems() {
   const { dayType } = useDayType();
-  const { entries } = useDailyLog();
-  const today = new Date().toISOString().split('T')[0];
-  const storageKey = `surge_checklist_${today}`;
+  const { entries, addEntry, removeEntry } = useDailyLog();
+  const { settings } = useAppSettings();
+  const storageKey = getManualStorageKey();
+  const [manualTicks, setManualTicks] = useState<TickStore>(() => readManualTicks(storageKey));
 
-  const [ticks, setTicks] = useState<TickStore>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(storageKey) ?? '{}');
-    } catch {
-      return {};
-    }
-  });
-
-  const [, setMinuteTick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setMinuteTick(n => n + 1), 60_000);
-    return () => clearInterval(t);
-  }, []);
+    setManualTicks(readManualTicks(storageKey));
+  }, [storageKey]);
 
   const toggle = useCallback((id: string) => {
-    setTicks(prev => {
+    setManualTicks(prev => {
       const wasOn = prev[id]?.ticked ?? false;
       const next: TickStore = { ...prev, [id]: { ticked: !wasOn, ts: Date.now() } };
       localStorage.setItem(storageKey, JSON.stringify(next));
@@ -50,84 +42,191 @@ export function useChecklistItems() {
   }, [storageKey]);
 
   const sections = dayType === 'training' ? TRAINING_SECTIONS : REST_SECTIONS;
+  const items = useMemo(() => sections.flatMap(section => section.items), [sections]);
 
-  const hydrationMin = getSavedNumber('surge_hydration_min', DEFAULT_TARGETS.hydrationMinL);
-  const stepGoal = getSavedNumber('surge_step_goal', DEFAULT_TARGETS.stepGoal);
+  const supplementEntries = entries.filter(entry => entry.type === 'supplement');
+  const mealEntries = entries.filter(entry => entry.type === 'meal');
+  const hydrationEntries = entries.filter(entry => entry.type === 'hydration');
+  const weightEntry = entries.filter(entry => entry.type === 'weight').at(-1) ?? null;
+  const stepsEntry = entries.filter(entry => entry.type === 'steps').at(-1) ?? null;
+  const workoutEntry = entries.filter(entry => entry.type === 'workout').at(-1) ?? null;
+  const cardioEntry = entries.filter(entry => entry.type === 'cardio').at(-1) ?? null;
 
-  const autoTicks: TickStore = {};
+  const totalLitres = hydrationEntries.reduce((sum, entry) => sum + (entry.payload as HydrationPayload).ml, 0) / 1000;
+  const currentSteps = stepsEntry ? (stepsEntry.payload as StepsPayload).steps : 0;
 
-  const weightEntry = entries.filter(e => e.type === 'weight').at(-1);
-  if (weightEntry) {
-    autoTicks.weigh = { ticked: true, ts: weightEntry.timestamp };
-  }
+  const itemStates = useMemo(() => {
+    const states: Record<string, ChecklistItemState> = {};
 
-  const supplementMap: Record<string, string> = {
-    'Omega 3': 'supp-omega3',
-    'Vitamin D': 'supp-vitd',
-    'Vitamin C': 'supp-vitc',
-    Multivitamin: 'supp-multi',
-    'B Vitamin': 'supp-bvit',
-    'Essential Amino Acids (EAA)': 'supp-eaa',
-    Creatine: 'supp-creatine',
-    Magnesium: 'supp-magnesium',
+    for (const item of items) {
+      let ticked = false;
+      let canUndo = false;
+
+      switch (item.source) {
+        case 'manual': {
+          ticked = manualTicks[item.id]?.ticked ?? false;
+          canUndo = ticked;
+          break;
+        }
+        case 'weight': {
+          ticked = !!weightEntry;
+          canUndo = !!weightEntry;
+          break;
+        }
+        case 'supplement': {
+          const entry = supplementEntries.find(value => {
+            const payload = value.payload as SupplementPayload;
+            return payload.taken && payload.name === item.logKey;
+          });
+          ticked = !!entry;
+          canUndo = !!entry;
+          break;
+        }
+        case 'meal': {
+          const entry = mealEntries.find(value => (value.payload as MealPayload).slot === item.logKey);
+          ticked = !!entry;
+          canUndo = !!entry;
+          break;
+        }
+        case 'hydration': {
+          ticked = totalLitres >= settings.hydrationMinL;
+          canUndo = hydrationEntries.length > 0;
+          break;
+        }
+        case 'steps': {
+          ticked = currentSteps >= settings.stepGoal;
+          canUndo = !!stepsEntry;
+          break;
+        }
+        case 'workout': {
+          ticked = !!workoutEntry;
+          canUndo = !!workoutEntry;
+          break;
+        }
+        case 'cardio': {
+          ticked = !!cardioEntry;
+          canUndo = !!cardioEntry;
+          break;
+        }
+      }
+
+      states[item.id] = {
+        id: item.id,
+        ticked,
+        source: item.source,
+        canUndo,
+        overdue: false,
+        optional: item.optional ?? false,
+        hintText: item.label,
+      };
+    }
+
+    return states;
+  }, [items, manualTicks, weightEntry, supplementEntries, mealEntries, totalLitres, settings.hydrationMinL, currentSteps, settings.stepGoal, stepsEntry, workoutEntry, cardioEntry, hydrationEntries.length]);
+
+  const doneCount = items.filter(item => itemStates[item.id]?.ticked).length;
+  const totalCount = items.length;
+  const nextItemId = items.find(item => !itemStates[item.id]?.ticked && !item.optional)?.id ?? null;
+
+  const mealIds = ['prewo-snack', 'meal-1', 'meal-2', 'meal-3', 'meal-4'];
+  const mealTimestamps = mealIds.map(id => {
+    const item = items.find(value => value.id === id);
+    if (!item?.logKey) return 0;
+    const entry = mealEntries.find(value => (value.payload as MealPayload).slot === item.logKey);
+    return entry?.timestamp ?? 0;
+  }).filter(Boolean);
+  const firstMealTs = [...mealTimestamps].sort((left, right) => left - right)[0] ?? 0;
+  const lastMealTs = mealTimestamps.reduce((max, value) => Math.max(max, value), 0);
+
+  const completeItem = useCallback(async (id: string) => {
+    const item = items.find(value => value.id === id);
+    if (!item) return;
+
+    if (item.source === 'manual') {
+      toggle(id);
+      return;
+    }
+
+    if (item.source === 'supplement' && item.logKey) {
+      await addEntry('supplement', { name: item.logKey, taken: true }, `supp-${item.logKey.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}`);
+      return;
+    }
+
+    if (item.source === 'meal' && item.logKey) {
+      const slot = NUTRITION_PLAN[dayType].slots.find(value => value.id === item.logKey);
+      if (!slot) return;
+      await addEntry('meal', { slot: item.logKey, alternative: slot.defaultOption }, `meal-${item.logKey}-${new Date().toISOString().split('T')[0]}`);
+      return;
+    }
+
+    if (item.source === 'hydration') {
+      await addEntry('hydration', { ml: 500 });
+    }
+  }, [items, toggle, addEntry, dayType]);
+
+  const undoItem = useCallback(async (id: string) => {
+    const item = items.find(value => value.id === id);
+    if (!item) return;
+
+    if (item.source === 'manual') {
+      toggle(id);
+      return;
+    }
+
+    if (item.source === 'weight' && weightEntry) {
+      await removeEntry(weightEntry);
+      return;
+    }
+
+    if (item.source === 'supplement') {
+      const entry = [...supplementEntries].reverse().find(value => {
+        const payload = value.payload as SupplementPayload;
+        return payload.taken && payload.name === item.logKey;
+      });
+      if (entry) await removeEntry(entry);
+      return;
+    }
+
+    if (item.source === 'meal') {
+      const entry = [...mealEntries].reverse().find(value => (value.payload as MealPayload).slot === item.logKey);
+      if (entry) await removeEntry(entry);
+      return;
+    }
+
+    if (item.source === 'hydration') {
+      const entry = [...hydrationEntries].reverse()[0];
+      if (entry) await removeEntry(entry);
+      return;
+    }
+
+    if (item.source === 'steps' && stepsEntry) {
+      await removeEntry(stepsEntry);
+      return;
+    }
+
+    if (item.source === 'workout' && workoutEntry) {
+      await removeEntry(workoutEntry);
+      return;
+    }
+
+    if (item.source === 'cardio' && cardioEntry) {
+      await removeEntry(cardioEntry);
+    }
+  }, [items, toggle, weightEntry, supplementEntries, mealEntries, hydrationEntries, stepsEntry, workoutEntry, cardioEntry, removeEntry]);
+
+  return {
+    sections,
+    items,
+    itemStates,
+    doneCount,
+    totalCount,
+    toggle,
+    completeItem,
+    undoItem,
+    nextItemId,
+    lastMealTs,
+    firstMealTs,
+    hydrationTarget: settings.hydrationMinL,
+    stepGoal: settings.stepGoal,
   };
-
-  for (const entry of entries.filter(e => e.type === 'supplement')) {
-    const payload = entry.payload as SupplementPayload;
-    const checklistId = supplementMap[payload.name];
-    if (payload.taken && checklistId) {
-      autoTicks[checklistId] = { ticked: true, ts: entry.timestamp };
-    }
-  }
-
-  for (const entry of entries.filter(e => e.type === 'meal')) {
-    const payload = entry.payload as MealPayload;
-    const mealMap: Record<string, string> = {
-      prewo: 'prewo-snack',
-      m1: 'meal-1',
-      m2: 'meal-2',
-      m3: 'meal-3',
-      m4: 'meal-4',
-    };
-    const checklistId = mealMap[payload.slot];
-    if (checklistId) {
-      autoTicks[checklistId] = { ticked: true, ts: entry.timestamp };
-    }
-  }
-
-  const hydrationEntries = entries.filter(e => e.type === 'hydration');
-  const totalLitres = hydrationEntries.reduce((sum, entry) => {
-    return sum + (entry.payload as HydrationPayload).ml;
-  }, 0) / 1000;
-  if (totalLitres >= hydrationMin && hydrationEntries.length > 0) {
-    autoTicks.hydration = { ticked: true, ts: hydrationEntries[hydrationEntries.length - 1].timestamp };
-  }
-
-  const stepsEntry = entries.filter(e => e.type === 'steps').at(-1);
-  if (stepsEntry && (stepsEntry.payload as StepsPayload).steps >= stepGoal) {
-    autoTicks.steps = { ticked: true, ts: stepsEntry.timestamp };
-  }
-
-  const workoutEntry = entries.filter(e => e.type === 'workout').at(-1);
-  if (workoutEntry) {
-    autoTicks.workout = { ticked: true, ts: workoutEntry.timestamp };
-  }
-
-  const mergedTicks: TickStore = { ...ticks, ...autoTicks };
-
-  const allItems = sections.flatMap(s => s.items).map(item => ({
-    ...item,
-    ticked: mergedTicks[item.id]?.ticked ?? false,
-  }));
-
-  const doneCount = allItems.filter(i => i.ticked).length;
-  const totalCount = allItems.length;
-  const nextItemId = allItems.find(i => !i.ticked)?.id ?? null;
-
-  const mealIds = new Set(['prewo-snack', 'meal-1', 'meal-2', 'meal-3', 'meal-4']);
-  const lastMealTs = Object.entries(mergedTicks)
-    .filter(([id, entry]) => mealIds.has(id) && entry.ticked)
-    .reduce((max, [, entry]) => Math.max(max, entry.ts), 0);
-
-  return { sections, ticks: mergedTicks, doneCount, totalCount, toggle, nextItemId, lastMealTs };
 }

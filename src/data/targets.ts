@@ -17,11 +17,11 @@ export const DEFAULT_TARGETS: Targets = {
 };
 
 export const COOKING_RULES = [
-  'Weigh all food RAW/DRY — 10% tolerance ±',
-  'Use Frylight / 1-cal spray for all cooking',
-  'Pink Himalayan Salt — 5–6 turns per meal',
-  'Light sauces 15g max, or zero-cal syrups',
-  'Max 1 diet drink per day',
-  '1–2 coffees/teas (black or with almond/skimmed milk)',
-  'Eat every 3–4 hours after first meal',
+  'Weigh all food raw or dry, with a 10% tolerance.',
+  'Use Frylight or 1-cal spray for cooking.',
+  'Pink Himalayan salt: 5-6 turns per meal.',
+  'Light sauces 15g max, or zero-calorie syrups.',
+  'Max 1 diet drink per day.',
+  '1-2 coffees or teas, black or with almond/skimmed milk.',
+  'Eat every 3-4 hours after your first meal.',
 ];

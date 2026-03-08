@@ -1,6 +1,8 @@
 export type SessionType = 'push' | 'pull' | 'legs' | 'upper' | 'rest';
 export type DayType = 'training' | 'rest';
 export type LogType = 'hydration' | 'supplement' | 'meal' | 'workout' | 'weight' | 'cardio' | 'steps';
+export type ReminderType = 'meals' | 'tasks' | 'hydration' | 'steps';
+export type ChecklistItemSource = 'manual' | 'weight' | 'supplement' | 'meal' | 'hydration' | 'steps' | 'workout' | 'cardio';
 
 export interface HydrationPayload { ml: number }
 export interface SupplementPayload { name: string; taken: boolean }
@@ -107,3 +109,49 @@ export interface Targets {
   cardioZ3PerWeek: number;
 }
 
+export interface ReminderSettings {
+  browserNotifications: boolean;
+  mealReminders: boolean;
+  taskReminders: boolean;
+  hydrationReminders: boolean;
+  stepsReminders: boolean;
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  wakeTime: string;
+  workoutTime: string;
+  eveningTime: string;
+  mealGapMin: number;
+  followUpMin: number;
+}
+
+export interface AppSettings extends Targets {
+  reminders: ReminderSettings;
+}
+
+export interface WeeklyPlanDay {
+  date: string;
+  dayType: DayType;
+  selections: Record<string, string>;
+}
+
+export interface WeeklyPlan {
+  weekStart: string;
+  days: WeeklyPlanDay[];
+}
+
+export interface ChecklistItemState {
+  id: string;
+  ticked: boolean;
+  source: ChecklistItemSource;
+  canUndo: boolean;
+  overdue: boolean;
+  optional: boolean;
+  hintText?: string;
+}
+
+export interface ReminderCardState {
+  title: string;
+  detail: string;
+  itemIds: string[];
+  level: 'info' | 'warning';
+}
