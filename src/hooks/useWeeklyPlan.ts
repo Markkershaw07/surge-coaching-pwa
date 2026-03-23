@@ -86,8 +86,8 @@ function saveWeekPlan(plan: WeeklyPlan) {
 
 function categoryForFood(name: string): string {
   const lower = name.toLowerCase();
-  if (lower.includes('chicken') || lower.includes('beef') || lower.includes('steak') || lower.includes('egg') || lower.includes('whey') || lower.includes('yoghurt')) return 'Protein';
-  if (lower.includes('rice') || lower.includes('pasta') || lower.includes('oats') || lower.includes('bread') || lower.includes('potato') || lower.includes('wrap') || lower.includes('noodles')) return 'Carbs';
+  if (lower.includes('chicken') || lower.includes('beef') || lower.includes('steak') || lower.includes('egg') || lower.includes('whey') || lower.includes('yoghurt') || lower.includes('bacon')) return 'Protein';
+  if (lower.includes('rice') || lower.includes('pasta') || lower.includes('oats') || lower.includes('bread') || lower.includes('potato') || lower.includes('wrap') || lower.includes('noodles') || lower.includes('bagel')) return 'Carbs';
   if (lower.includes('berries') || lower.includes('veg') || lower.includes('avocado')) return 'Fruit and veg';
   if (lower.includes('cheese') || lower.includes('parmesan') || lower.includes('philadelphia')) return 'Dairy';
   return 'Extras';
