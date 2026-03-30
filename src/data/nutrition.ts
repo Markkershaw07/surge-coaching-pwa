@@ -261,6 +261,17 @@ export const NUTRITION_PLAN: NutritionPlan = {
             ],
             totals: { kcal: 633, p: 57.5, c: 65.3, f: 14.6 },
           },
+          {
+            id: 'm3-nandos',
+            label: 'Nandos',
+            foods: [
+              { name: 'Chicken Breast Raw', qty: '230g', kcal: 249, p: 47, c: 0, f: 6.9 },
+              { name: 'White Potato', qty: '300g', kcal: 276, p: 6.4, c: 56, f: 0.5 },
+              { name: 'Corn Cob', qty: '100g', kcal: 80, p: 3.6, c: 9.5, f: 1.9 },
+              { name: "Peri-Peri Sauce (Nando's)", qty: '60g', kcal: 30, p: 0.6, c: 0.9, f: 2.7 },
+            ],
+            totals: { kcal: 635, p: 57.6, c: 66.4, f: 12 },
+          },
         ],
       },
       {
