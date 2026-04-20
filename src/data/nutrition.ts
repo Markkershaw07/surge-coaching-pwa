@@ -2,10 +2,10 @@ import type { NutritionPlan } from '../types';
 
 export const NUTRITION_PLAN: NutritionPlan = {
   training: {
-    targetKcal: 2293,
-    targetP: 200.6,
-    targetC: 235.2,
-    targetF: 58.7,
+    targetKcal: 2241,
+    targetP: 199.6,
+    targetC: 224.2,
+    targetF: 58.6,
     slots: [
       {
         id: 'prewo',
@@ -74,22 +74,22 @@ export const NUTRITION_PLAN: NutritionPlan = {
             foods: [
               { name: 'Chicken Breast Raw', qty: '200g', kcal: 216, p: 41, c: 0, f: 6 },
               { name: 'White Wrap', qty: '1', kcal: 176, p: 6, c: 31, f: 3.1 },
-              { name: 'Cooked White Rice', qty: '100g', kcal: 130, p: 2.4, c: 28, f: 0.2 },
+              { name: 'Cooked White Rice', qty: '60g', kcal: 78, p: 1.4, c: 17, f: 0.1 },
               { name: 'Veg of choice', qty: '100g', kcal: 56, p: 4, c: 10, f: 0 },
               { name: 'Light Cheese', qty: '20g', kcal: 52, p: 5.9, c: 0.1, f: 3.2 },
             ],
-            totals: { kcal: 630, p: 59.3, c: 69.1, f: 12.5 },
+            totals: { kcal: 578, p: 58.3, c: 58.1, f: 12.4 },
           },
           {
             id: 'm2-bowl',
             label: 'Chicken & Sweet Potato Bowl',
             foods: [
               { name: 'Chicken Breast Raw', qty: '200g', kcal: 216, p: 41, c: 0, f: 6 },
-              { name: 'Sweet Potato', qty: '350g', kcal: 301, p: 5.5, c: 60, f: 0.2 },
+              { name: 'Sweet Potato', qty: '280g', kcal: 241, p: 4.4, c: 48, f: 0.1 },
               { name: 'Veg of choice', qty: '100g', kcal: 56, p: 4, c: 10, f: 0 },
               { name: 'Avocado', qty: '40g', kcal: 64, p: 0.8, c: 0.7, f: 5.9 },
             ],
-            totals: { kcal: 637, p: 51.3, c: 70.7, f: 12.1 },
+            totals: { kcal: 577, p: 50.2, c: 58.7, f: 12 },
           },
         ],
       },
@@ -158,10 +158,10 @@ export const NUTRITION_PLAN: NutritionPlan = {
     ],
   },
   rest: {
-    targetKcal: 2066,
-    targetP: 190.5,
-    targetC: 201.4,
-    targetF: 50.1,
+    targetKcal: 2014,
+    targetP: 189.5,
+    targetC: 190.4,
+    targetF: 50,
     slots: [
       {
         id: 'm1',
@@ -214,22 +214,22 @@ export const NUTRITION_PLAN: NutritionPlan = {
             foods: [
               { name: 'Chicken Breast Raw', qty: '200g', kcal: 216, p: 41, c: 0, f: 6 },
               { name: 'White Wrap', qty: '1', kcal: 176, p: 6, c: 31, f: 3.1 },
-              { name: 'Cooked White Rice', qty: '100g', kcal: 130, p: 2.4, c: 28, f: 0.2 },
+              { name: 'Cooked White Rice', qty: '60g', kcal: 78, p: 1.4, c: 17, f: 0.1 },
               { name: 'Veg of choice', qty: '100g', kcal: 56, p: 4, c: 10, f: 0 },
               { name: 'Light Cheese', qty: '20g', kcal: 52, p: 5.9, c: 0.1, f: 3.2 },
             ],
-            totals: { kcal: 630, p: 59.3, c: 69.1, f: 12.5 },
+            totals: { kcal: 578, p: 58.3, c: 58.1, f: 12.4 },
           },
           {
             id: 'm2-bowl',
             label: 'Chicken Rice Bowl',
             foods: [
               { name: 'Chicken Breast Raw', qty: '220g', kcal: 238, p: 45, c: 0, f: 6.6 },
-              { name: 'White Rice (Uncooked)', qty: '70g', kcal: 256, p: 5, c: 55, f: 0.4 },
+              { name: 'White Rice (Uncooked)', qty: '55g', kcal: 201, p: 3.9, c: 43, f: 0.3 },
               { name: 'Veg of choice', qty: '100g', kcal: 56, p: 4, c: 10, f: 0 },
               { name: 'Avocado', qty: '40g', kcal: 82, p: 2.5, c: 2.5, f: 7.3 },
             ],
-            totals: { kcal: 632, p: 56.5, c: 67.5, f: 14.3 },
+            totals: { kcal: 577, p: 55.4, c: 55.5, f: 14.2 },
           },
         ],
       },
