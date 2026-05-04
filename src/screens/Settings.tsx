@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bell, Download, Settings2, Shield, Upload } from 'lucide-react';
 import { exportBackup, importBackup } from '../utils/backup';
+import { exportComplianceCsv, exportWorkoutCsv } from '../utils/exportCsv';
 import { PLAN_VERSION } from '../data/targets';
 import { useAppSettings } from '../hooks/useAppSettings';
 
@@ -77,6 +78,19 @@ export function Settings() {
         </label>
         {importError && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-300">{importError}</div>}
         {importSuccess && <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-xs text-green-300">Import successful. Reloading...</div>}
+      </div>
+
+      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
+        <h2 className="font-semibold text-slate-200">Coach exports</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => exportWorkoutCsv()} className="bg-slate-700 active:bg-slate-600 text-slate-100 py-3 rounded-xl text-sm font-medium">
+            Workout CSV
+          </button>
+          <button onClick={() => exportComplianceCsv()} className="bg-slate-700 active:bg-slate-600 text-slate-100 py-3 rounded-xl text-sm font-medium">
+            Compliance CSV
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">Use these when you want a spreadsheet-friendly export for your coach or your own review.</p>
       </div>
 
       <div className="bg-slate-800 rounded-2xl p-4 space-y-4">

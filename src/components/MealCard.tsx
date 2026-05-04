@@ -6,11 +6,22 @@ interface Props {
   slot: MealSlot;
   selectedOptionId: string;
   onSelect: (optionId: string) => void;
+  actionLabel?: string;
+  actionTone?: 'primary' | 'success' | 'muted';
+  actionDisabled?: boolean;
+  onAction?: () => void;
+  statusText?: string;
 }
 
-export function MealCard({ slot, selectedOptionId, onSelect }: Props) {
+export function MealCard({ slot, selectedOptionId, onSelect, actionLabel, actionTone = 'primary', actionDisabled, onAction, statusText }: Props) {
   const [open, setOpen] = useState(false);
   const selected = slot.options.find(option => option.id === selectedOptionId) ?? slot.options[0];
+
+  const actionClasses = actionTone === 'success'
+    ? 'bg-green-600 text-white'
+    : actionTone === 'muted'
+      ? 'bg-slate-700 text-slate-300'
+      : 'bg-orange-500 text-white';
 
   return (
     <div className="bg-slate-800 rounded-xl overflow-hidden">
@@ -24,6 +35,7 @@ export function MealCard({ slot, selectedOptionId, onSelect }: Props) {
           <p className="text-xs text-slate-400">
             {selected.totals.kcal} kcal | {selected.totals.p}g P | {selected.totals.c}g C | {selected.totals.f}g F
           </p>
+          {statusText && <p className="text-xs text-slate-500 mt-1">{statusText}</p>}
         </div>
         {open ? <ChevronUp size={18} className="text-slate-400 shrink-0" /> : <ChevronDown size={18} className="text-slate-400 shrink-0" />}
       </button>
@@ -46,6 +58,16 @@ export function MealCard({ slot, selectedOptionId, onSelect }: Props) {
                 </button>
               ))}
             </div>
+          )}
+
+          {onAction && actionLabel && (
+            <button
+              onClick={onAction}
+              disabled={actionDisabled}
+              className={`w-full rounded-xl px-3 py-2 text-sm font-medium disabled:opacity-60 ${actionClasses}`}
+            >
+              {actionLabel}
+            </button>
           )}
 
           <table className="w-full text-xs">

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDayType } from './useDayType';
 import { useDailyLog } from './useDailyLog';
 import { useAppSettings } from './useAppSettings';
+import { useWeeklyPlan } from './useWeeklyPlan';
 import { TRAINING_SECTIONS, REST_SECTIONS } from '../data/checklistSchedule';
 import { NUTRITION_PLAN } from '../data/nutrition';
-import type { ChecklistItemState, HydrationPayload, MealPayload, StepsPayload, SupplementPayload } from '../types';
+import type { ChecklistItemState, HydrationPayload, MealPayload, StepsPayload, SupplementPayload, WorkoutPayload } from '../types';
 
 function getManualStorageKey() {
   return `surge_checklist_${new Date().toISOString().split('T')[0]}`;
@@ -21,10 +22,15 @@ function readManualTicks(storageKey: string): TickStore {
   }
 }
 
+function todayKey() {
+  return new Date().toISOString().split('T')[0];
+}
+
 export function useChecklistItems() {
-  const { dayType } = useDayType();
-  const { entries, addEntry, removeEntry } = useDailyLog();
+  const { dayType, session } = useDayType();
+  const { entries, addEntry, editEntry, removeEntry } = useDailyLog();
   const { settings } = useAppSettings();
+  const weeklyPlan = useWeeklyPlan();
   const storageKey = getManualStorageKey();
   const [manualTicks, setManualTicks] = useState<TickStore>(() => readManualTicks(storageKey));
 
@@ -43,17 +49,31 @@ export function useChecklistItems() {
 
   const sections = dayType === 'training' ? TRAINING_SECTIONS : REST_SECTIONS;
   const items = useMemo(() => sections.flatMap(section => section.items), [sections]);
+  const todayPlan = weeklyPlan.getDay(todayKey());
 
   const supplementEntries = entries.filter(entry => entry.type === 'supplement');
   const mealEntries = entries.filter(entry => entry.type === 'meal');
   const hydrationEntries = entries.filter(entry => entry.type === 'hydration');
   const weightEntry = entries.filter(entry => entry.type === 'weight').at(-1) ?? null;
   const stepsEntry = entries.filter(entry => entry.type === 'steps').at(-1) ?? null;
-  const workoutEntry = entries.filter(entry => entry.type === 'workout').at(-1) ?? null;
+  const workoutEntry = [...entries].reverse().find(entry => {
+    if (entry.type !== 'workout') return false;
+    const payload = entry.payload as WorkoutPayload;
+    return payload.sessionType === session && payload.finished;
+  }) ?? null;
   const cardioEntry = entries.filter(entry => entry.type === 'cardio').at(-1) ?? null;
 
   const totalLitres = hydrationEntries.reduce((sum, entry) => sum + (entry.payload as HydrationPayload).ml, 0) / 1000;
   const currentSteps = stepsEntry ? (stepsEntry.payload as StepsPayload).steps : 0;
+
+  const mealMap = useMemo(() => {
+    const next = new Map<string, { entry: typeof mealEntries[number]; payload: MealPayload }>();
+    for (const entry of mealEntries) {
+      const payload = entry.payload as MealPayload;
+      next.set(payload.slot, { entry, payload });
+    }
+    return next;
+  }, [mealEntries]);
 
   const itemStates = useMemo(() => {
     const states: Record<string, ChecklistItemState> = {};
@@ -61,16 +81,19 @@ export function useChecklistItems() {
     for (const item of items) {
       let ticked = false;
       let canUndo = false;
+      let detailText = item.label;
 
       switch (item.source) {
         case 'manual': {
           ticked = manualTicks[item.id]?.ticked ?? false;
           canUndo = ticked;
+          detailText = ticked ? 'Completed manually' : (item.hint ?? item.label);
           break;
         }
         case 'weight': {
           ticked = !!weightEntry;
           canUndo = !!weightEntry;
+          detailText = weightEntry ? `${(weightEntry.payload as { kg: number }).kg} kg logged` : 'Log your morning weight';
           break;
         }
         case 'supplement': {
@@ -80,32 +103,38 @@ export function useChecklistItems() {
           });
           ticked = !!entry;
           canUndo = !!entry;
+          detailText = ticked ? 'Logged from your supplement plan' : (item.dose ?? item.label);
           break;
         }
         case 'meal': {
-          const entry = mealEntries.find(value => (value.payload as MealPayload).slot === item.logKey);
-          ticked = !!entry;
-          canUndo = !!entry;
+          const meal = item.logKey ? mealMap.get(item.logKey) : undefined;
+          ticked = !!meal?.payload.eaten;
+          canUndo = !!meal?.entry;
+          detailText = meal?.payload.eaten ? 'Logged as eaten' : 'Choose and mark as eaten from your plan';
           break;
         }
         case 'hydration': {
           ticked = totalLitres >= settings.hydrationMinL;
           canUndo = hydrationEntries.length > 0;
+          detailText = `${totalLitres.toFixed(1)}L of ${settings.hydrationMinL}L`; 
           break;
         }
         case 'steps': {
           ticked = currentSteps >= settings.stepGoal;
           canUndo = !!stepsEntry;
+          detailText = `${currentSteps.toLocaleString()} of ${settings.stepGoal.toLocaleString()} steps`;
           break;
         }
         case 'workout': {
           ticked = !!workoutEntry;
           canUndo = !!workoutEntry;
+          detailText = ticked ? 'Finished workout logged' : 'Finish today\'s session to complete this';
           break;
         }
         case 'cardio': {
           ticked = !!cardioEntry;
           canUndo = !!cardioEntry;
+          detailText = ticked ? 'Cardio session logged' : 'Optional, but counts toward weekly cardio';
           break;
         }
       }
@@ -118,11 +147,12 @@ export function useChecklistItems() {
         overdue: false,
         optional: item.optional ?? false,
         hintText: item.label,
+        detailText,
       };
     }
 
     return states;
-  }, [items, manualTicks, weightEntry, supplementEntries, mealEntries, totalLitres, settings.hydrationMinL, currentSteps, settings.stepGoal, stepsEntry, workoutEntry, cardioEntry, hydrationEntries.length]);
+  }, [items, manualTicks, weightEntry, supplementEntries, mealMap, totalLitres, settings.hydrationMinL, currentSteps, settings.stepGoal, stepsEntry, workoutEntry, cardioEntry, hydrationEntries.length]);
 
   const doneCount = items.filter(item => itemStates[item.id]?.ticked).length;
   const totalCount = items.length;
@@ -132,8 +162,9 @@ export function useChecklistItems() {
   const mealTimestamps = mealIds.map(id => {
     const item = items.find(value => value.id === id);
     if (!item?.logKey) return 0;
-    const entry = mealEntries.find(value => (value.payload as MealPayload).slot === item.logKey);
-    return entry?.timestamp ?? 0;
+    const meal = mealMap.get(item.logKey);
+    if (!meal?.payload.eaten) return 0;
+    return meal.payload.eatenAt ?? meal.entry.timestamp;
   }).filter(Boolean);
   const firstMealTs = [...mealTimestamps].sort((left, right) => left - right)[0] ?? 0;
   const lastMealTs = mealTimestamps.reduce((max, value) => Math.max(max, value), 0);
@@ -148,21 +179,39 @@ export function useChecklistItems() {
     }
 
     if (item.source === 'supplement' && item.logKey) {
-      await addEntry('supplement', { name: item.logKey, taken: true }, `supp-${item.logKey.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}`);
+      await addEntry('supplement', { name: item.logKey, taken: true }, `supp-${item.logKey.replace(/\s+/g, '-')}-${todayKey()}`);
       return;
     }
 
     if (item.source === 'meal' && item.logKey) {
-      const slot = NUTRITION_PLAN[dayType].slots.find(value => value.id === item.logKey);
-      if (!slot) return;
-      await addEntry('meal', { slot: item.logKey, alternative: slot.defaultOption }, `meal-${item.logKey}-${new Date().toISOString().split('T')[0]}`);
+      const existing = mealMap.get(item.logKey);
+      const alternative = existing?.payload.alternative
+        ?? todayPlan?.selections[item.logKey]
+        ?? NUTRITION_PLAN[dayType].slots.find(value => value.id === item.logKey)?.defaultOption;
+      if (!alternative) return;
+
+      if (existing) {
+        await editEntry(existing.entry, {
+          ...existing.payload,
+          alternative,
+          eaten: true,
+          eatenAt: Date.now(),
+        });
+      } else {
+        await addEntry('meal', {
+          slot: item.logKey,
+          alternative,
+          eaten: true,
+          eatenAt: Date.now(),
+        }, `meal-${item.logKey}-${todayKey()}`);
+      }
       return;
     }
 
     if (item.source === 'hydration') {
       await addEntry('hydration', { ml: 500 });
     }
-  }, [items, toggle, addEntry, dayType]);
+  }, [items, toggle, addEntry, mealMap, todayPlan, dayType, editEntry]);
 
   const undoItem = useCallback(async (id: string) => {
     const item = items.find(value => value.id === id);
@@ -187,9 +236,15 @@ export function useChecklistItems() {
       return;
     }
 
-    if (item.source === 'meal') {
-      const entry = [...mealEntries].reverse().find(value => (value.payload as MealPayload).slot === item.logKey);
-      if (entry) await removeEntry(entry);
+    if (item.source === 'meal' && item.logKey) {
+      const meal = mealMap.get(item.logKey);
+      if (meal) {
+        await editEntry(meal.entry, {
+          ...meal.payload,
+          eaten: false,
+          eatenAt: undefined,
+        });
+      }
       return;
     }
 
@@ -212,7 +267,7 @@ export function useChecklistItems() {
     if (item.source === 'cardio' && cardioEntry) {
       await removeEntry(cardioEntry);
     }
-  }, [items, toggle, weightEntry, supplementEntries, mealEntries, hydrationEntries, stepsEntry, workoutEntry, cardioEntry, removeEntry]);
+  }, [items, toggle, weightEntry, supplementEntries, mealMap, hydrationEntries, stepsEntry, workoutEntry, cardioEntry, removeEntry, editEntry]);
 
   return {
     sections,

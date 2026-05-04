@@ -91,7 +91,7 @@ interface ItemRowProps {
 }
 
 function ItemRow({ item, state, isNext, onComplete, onUndo, movementPrepDetails }: ItemRowProps) {
-  const sublabel = [item.dose, item.hint].filter(Boolean).join(' | ');
+  const sublabel = state.detailText ?? [item.dose, item.hint].filter(Boolean).join(' | ');
 
   const handlePress = () => {
     if (state.ticked && state.canUndo) {
@@ -184,11 +184,12 @@ export function DayChecklist() {
   const { addEntry, getByType } = useDailyLog();
   const movementPrepDetails = MOVEMENT_PREP[session] ?? [];
 
-  const checklistItems = Object.values(itemStates);
+  const checklistItems = Object.values(itemStates).map(item => ({ ...item }));
   const { overdueIds, reminderCard } = useReminders({ items: checklistItems, firstMealTs });
   for (const item of checklistItems) {
     item.overdue = overdueIds.has(item.id);
   }
+  const displayItemStates = Object.fromEntries(checklistItems.map(item => [item.id, item]));
 
   const weightEntries = getByType('weight');
   const loggedKg = weightEntries.length > 0 ? (weightEntries[weightEntries.length - 1].payload as WeightPayload).kg : null;
@@ -224,7 +225,7 @@ export function DayChecklist() {
           <SectionBlock
             key={section.id}
             section={section}
-            itemStates={itemStates}
+            itemStates={displayItemStates}
             nextItemId={nextItemId}
             loggedKg={loggedKg}
             onComplete={completeItem}

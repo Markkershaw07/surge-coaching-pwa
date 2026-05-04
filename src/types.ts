@@ -6,10 +6,10 @@ export type ChecklistItemSource = 'manual' | 'weight' | 'supplement' | 'meal' | 
 
 export interface HydrationPayload { ml: number }
 export interface SupplementPayload { name: string; taken: boolean }
-export interface MealPayload { slot: string; alternative: string }
-export interface WorkoutPayload { sessionType: SessionType; exercises: ExerciseLog[] }
+export interface MealPayload { slot: string; alternative: string; eaten: boolean; eatenAt?: number }
+export interface WorkoutPayload { sessionType: SessionType; exercises: ExerciseLog[]; finished: boolean; finishedAt?: number; durationMin?: number }
 export interface WeightPayload { kg: number }
-export interface CardioPayload { zone: 2 | 3; durationMin: number; distanceKm?: number }
+export interface CardioPayload { zone: 2 | 3; durationMin: number; distanceKm?: number; modality?: string }
 export interface StepsPayload { steps: number }
 
 export interface ExerciseLog {
@@ -21,6 +21,7 @@ export interface SetLog {
   reps: number;
   weight: number;
   isFeeder?: boolean;
+  completedAt?: number;
 }
 
 export interface LogEntry {
@@ -147,6 +148,7 @@ export interface ChecklistItemState {
   overdue: boolean;
   optional: boolean;
   hintText?: string;
+  detailText?: string;
 }
 
 export interface ReminderCardState {
@@ -154,4 +156,16 @@ export interface ReminderCardState {
   detail: string;
   itemIds: string[];
   level: 'info' | 'warning';
+}
+
+export interface DailyComplianceSummary {
+  checklistDone: number;
+  checklistTotal: number;
+  hydrationLitres: number;
+  steps: number;
+  weightLogged: boolean;
+  workoutDone: boolean;
+  cardioDone: boolean;
+  mealsLogged: number;
+  supplementsLogged: number;
 }

@@ -15,7 +15,7 @@ function todayKey() {
 
 export function Nutrition() {
   const { dayType } = useDayType();
-  const { addEntry, getByType, loading } = useDailyLog();
+  const { addEntry, editEntry, getByType, loading } = useDailyLog();
   const weeklyPlan = useWeeklyPlan();
 
   const [viewType, setViewType] = useState<'training' | 'rest'>(dayType);
@@ -24,6 +24,7 @@ export function Nutrition() {
 
   const todayPlan = weeklyPlan.getDay(todayKey());
   const plan = NUTRITION_PLAN[viewType];
+  const todayMealEntries = getByType('meal');
 
   const [selections, setSelections] = useState<Record<string, string>>(() => {
     const defaults: Record<string, string> = {};
@@ -33,42 +34,75 @@ export function Nutrition() {
     return defaults;
   });
 
+  const mealState = useMemo(() => {
+    const next = new Map<string, { entryId: string; payload: MealPayload; entryRef: typeof todayMealEntries[number] }>();
+    for (const entry of todayMealEntries) {
+      const payload = entry.payload as MealPayload;
+      next.set(payload.slot, { entryId: entry.id, payload, entryRef: entry });
+    }
+    return next;
+  }, [todayMealEntries]);
+
   useEffect(() => {
     if (loading) return;
 
-    const mealEntries = getByType('meal');
-    const saved: Record<string, string> = {};
-    for (const entry of mealEntries) {
+    const baseSelections: Record<string, string> = {};
+    const sourceDayType = todayPlan?.dayType ?? dayType;
+    for (const slot of NUTRITION_PLAN[sourceDayType].slots) {
+      baseSelections[slot.id] = todayPlan?.selections[slot.id] ?? slot.defaultOption;
+    }
+
+    for (const entry of todayMealEntries) {
       const payload = entry.payload as MealPayload;
-      saved[payload.slot] = payload.alternative;
+      baseSelections[payload.slot] = payload.alternative;
     }
 
-    if (Object.keys(saved).length > 0) {
-      setSelections(prev => ({ ...prev, ...saved }));
-      return;
-    }
+    setSelections(baseSelections);
+    setViewType(sourceDayType);
+  }, [dayType, loading, todayMealEntries, todayPlan]);
 
-    if (todayPlan) {
-      setSelections({
-        ...todayPlan.selections,
-      });
-      setViewType(todayPlan.dayType);
+  const plannedTotals = computeDayTotals(plan, selections);
+  const eatenSelections = useMemo(() => {
+    const next: Record<string, string> = {};
+    for (const [slotId, state] of mealState.entries()) {
+      if (state.payload.eaten) next[slotId] = state.payload.alternative;
     }
-  }, [getByType, loading, todayPlan]);
-
-  const totals = computeDayTotals(plan, selections);
+    return next;
+  }, [mealState]);
+  const eatenTotals = computeDayTotals(plan, eatenSelections);
 
   const mismatches: string[] = [];
-  if (Math.abs(totals.kcal - plan.targetKcal) > 5) mismatches.push(`kcal: ${totals.kcal} vs ${plan.targetKcal} target`);
-  if (Math.abs(totals.p - plan.targetP) > 1) mismatches.push(`Protein: ${totals.p}g vs ${plan.targetP}g target`);
-  if (Math.abs(totals.c - plan.targetC) > 1) mismatches.push(`Carbs: ${totals.c}g vs ${plan.targetC}g target`);
-  if (Math.abs(totals.f - plan.targetF) > 1) mismatches.push(`Fat: ${totals.f}g vs ${plan.targetF}g target`);
+  if (Math.abs(plannedTotals.kcal - plan.targetKcal) > 5) mismatches.push(`kcal: ${plannedTotals.kcal} vs ${plan.targetKcal} target`);
+  if (Math.abs(plannedTotals.p - plan.targetP) > 1) mismatches.push(`Protein: ${plannedTotals.p}g vs ${plan.targetP}g target`);
+  if (Math.abs(plannedTotals.c - plan.targetC) > 1) mismatches.push(`Carbs: ${plannedTotals.c}g vs ${plan.targetC}g target`);
+  if (Math.abs(plannedTotals.f - plan.targetF) > 1) mismatches.push(`Fat: ${plannedTotals.f}g vs ${plan.targetF}g target`);
 
   const plannerTotals = useMemo(() => computeDayTotals(weeklyPlan.selectedPlan, weeklyPlan.selectedDay.selections), [weeklyPlan.selectedPlan, weeklyPlan.selectedDay]);
 
+  const upsertMeal = async (slotId: string, alternative: string, eaten: boolean) => {
+    const existing = mealState.get(slotId);
+    if (existing) {
+      await editEntry(existing.entryRef, {
+        ...existing.payload,
+        alternative,
+        eaten,
+        eatenAt: eaten ? (existing.payload.eatenAt ?? Date.now()) : undefined,
+      } as MealPayload);
+      return;
+    }
+
+    await addEntry('meal', {
+      slot: slotId,
+      alternative,
+      eaten,
+      eatenAt: eaten ? Date.now() : undefined,
+    } as MealPayload, `meal-${slotId}-${todayKey()}`);
+  };
+
   const handleSelect = async (slotId: string, optionId: string) => {
     setSelections(prev => ({ ...prev, [slotId]: optionId }));
-    await addEntry('meal', { slot: slotId, alternative: optionId } as MealPayload, `meal-${slotId}-${todayKey()}`);
+    const existing = mealState.get(slotId);
+    await upsertMeal(slotId, optionId, existing?.payload.eaten ?? false);
   };
 
   const applyTodayPlan = async () => {
@@ -76,8 +110,16 @@ export function Nutrition() {
     setViewType(todayPlan.dayType);
     setSelections(todayPlan.selections);
     for (const [slotId, optionId] of Object.entries(todayPlan.selections)) {
-      await addEntry('meal', { slot: slotId, alternative: optionId } as MealPayload, `meal-${slotId}-${todayKey()}`);
+      const existing = mealState.get(slotId);
+      await upsertMeal(slotId, optionId, existing?.payload.eaten ?? false);
     }
+  };
+
+  const toggleMealEaten = async (slotId: string) => {
+    const optionId = selections[slotId] ?? plan.slots.find(slot => slot.id === slotId)?.defaultOption;
+    if (!optionId) return;
+    const existing = mealState.get(slotId);
+    await upsertMeal(slotId, optionId, !(existing?.payload.eaten ?? false));
   };
 
   const copyShoppingList = async () => {
@@ -179,17 +221,31 @@ export function Nutrition() {
           </button>
         </div>
 
-        <div className="bg-slate-700/40 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-200">Day total</h2>
-            <div className="text-right">
-              <p className="text-lg font-bold text-orange-400">{totals.kcal} kcal</p>
-              <p className="text-xs text-slate-500">target: {plan.targetKcal} kcal</p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="bg-slate-700/40 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-slate-200">Planned intake</h2>
+              <div className="text-right">
+                <p className="text-lg font-bold text-orange-400">{plannedTotals.kcal} kcal</p>
+                <p className="text-xs text-slate-500">target: {plan.targetKcal} kcal</p>
+              </div>
             </div>
+            <MacroBar label="Protein" value={plannedTotals.p} target={plan.targetP} colour="#3b82f6" />
+            <MacroBar label="Carbs" value={plannedTotals.c} target={plan.targetC} colour="#eab308" />
+            <MacroBar label="Fat" value={plannedTotals.f} target={plan.targetF} colour="#ec4899" />
           </div>
-          <MacroBar label="Protein" value={totals.p} target={plan.targetP} colour="#3b82f6" />
-          <MacroBar label="Carbs" value={totals.c} target={plan.targetC} colour="#eab308" />
-          <MacroBar label="Fat" value={totals.f} target={plan.targetF} colour="#ec4899" />
+          <div className="bg-slate-700/40 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-slate-200">Eaten so far</h2>
+              <div className="text-right">
+                <p className="text-lg font-bold text-green-400">{eatenTotals.kcal} kcal</p>
+                <p className="text-xs text-slate-500">fills as you confirm meals</p>
+              </div>
+            </div>
+            <MacroBar label="Protein" value={eatenTotals.p} target={plan.targetP} colour="#22c55e" />
+            <MacroBar label="Carbs" value={eatenTotals.c} target={plan.targetC} colour="#14b8a6" />
+            <MacroBar label="Fat" value={eatenTotals.f} target={plan.targetF} colour="#f97316" />
+          </div>
         </div>
 
         {mismatches.length > 0 && (
@@ -205,14 +261,22 @@ export function Nutrition() {
         )}
 
         <div className="space-y-3">
-          {plan.slots.map(slot => (
-            <MealCard
-              key={slot.id}
-              slot={slot}
-              selectedOptionId={selections[slot.id] ?? slot.defaultOption}
-              onSelect={optionId => handleSelect(slot.id, optionId)}
-            />
-          ))}
+          {plan.slots.map(slot => {
+            const state = mealState.get(slot.id);
+            const eaten = state?.payload.eaten ?? false;
+            return (
+              <MealCard
+                key={slot.id}
+                slot={slot}
+                selectedOptionId={selections[slot.id] ?? slot.defaultOption}
+                onSelect={optionId => handleSelect(slot.id, optionId)}
+                onAction={() => toggleMealEaten(slot.id)}
+                actionLabel={eaten ? 'Mark as not eaten' : 'Mark as eaten'}
+                actionTone={eaten ? 'success' : 'primary'}
+                statusText={eaten ? 'Included in today\'s intake totals' : 'Planned only until you mark it eaten'}
+              />
+            );
+          })}
         </div>
       </div>
 
