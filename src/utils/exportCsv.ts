@@ -1,6 +1,9 @@
 import { get as idbGet, keys as idbKeys } from 'idb-keyval';
 import type { CardioPayload, LogEntry, MealPayload, StepsPayload, WorkoutPayload } from '../types';
 
+type CsvValue = string | number | boolean | undefined;
+type CsvRow = CsvValue[];
+
 async function getAllEntries(): Promise<LogEntry[]> {
   const allKeys = await idbKeys();
   const all: LogEntry[] = [];
@@ -18,13 +21,13 @@ async function getAllEntries(): Promise<LogEntry[]> {
   return Array.from(byId.values()).filter(entry => !entry.deleted).sort((left, right) => left.date.localeCompare(right.date) || left.timestamp - right.timestamp);
 }
 
-function escapeCsv(value: string | number | boolean | undefined): string {
+function escapeCsv(value: CsvValue): string {
   const text = String(value ?? '');
   if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
   return text;
 }
 
-function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number | boolean | undefined>>) {
+function downloadCsv(filename: string, headers: string[], rows: CsvRow[]) {
   const csv = [headers.join(','), ...rows.map(row => row.map(escapeCsv).join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -37,7 +40,7 @@ function downloadCsv(filename: string, headers: string[], rows: Array<Array<stri
 
 export async function exportComplianceCsv(): Promise<void> {
   const entries = await getAllEntries();
-  const rows = entries.flatMap(entry => {
+  const rows: CsvRow[] = entries.flatMap((entry): CsvRow[] => {
     switch (entry.type) {
       case 'weight':
         return [[entry.date, 'weight', (entry.payload as { kg: number }).kg, '', '', '']];
@@ -67,9 +70,9 @@ export async function exportComplianceCsv(): Promise<void> {
 
 export async function exportWorkoutCsv(): Promise<void> {
   const entries = await getAllEntries();
-  const workoutRows = entries
+  const workoutRows: CsvRow[] = entries
     .filter(entry => entry.type === 'workout')
-    .flatMap(entry => {
+    .flatMap((entry): CsvRow[] => {
       const payload = entry.payload as WorkoutPayload;
       return payload.exercises.flatMap(exercise =>
         exercise.sets.map(set => [
